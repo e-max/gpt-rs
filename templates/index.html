@@ -174,7 +174,13 @@ li.assistant {
 			let socket;
 
             function connect() {
-                socket = new WebSocket("wss://valheim-bot.e-max.dev/websocket");
+				const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+				const domain = window.location.hostname;
+				const port = window.location.port ? `:${window.location.port}` : '';
+				const path = '/websocket';
+				const websocketUrl = `${protocol}://${domain}${port}${path}`;
+
+                socket = new WebSocket(websocketUrl);
 
                 socket.onopen = function() {
                     console.log("connection opened");
