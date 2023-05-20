@@ -1,0 +1,15 @@
+<div>
+	Tokens in user request: {{info.user_message_tokens}}<br/>
+	Number messages from history sent to server {{info.history_count}}<br/>
+	Tokens in history: {{info.history_size}}<br/>
+	Tokens in embeddings: {{info.context_info.size}} <br/>
+	Embeddings list:
+	<table>
+		<th> file </th><th>score</th>
+            {% for file in info.context_info.filenames %}
+			<tr>
+				<td><a href="/context/{{file.filename}}">{{file.filename}}</a></td><td>{{file.score}}</td>
+			</tr>
+            {% endfor %}
+	</table>
+</div>

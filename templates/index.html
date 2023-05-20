@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 1rem;
+            overflow-y: scroll;
+            flex-grow: 1;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        form {
+            display: flex;
+            justify-content: center;
+            background-color: #f7f7f7;
+            padding: 1rem;
+            border-top: 1px solid #ddd;
+        }
+
+        input {
+            flex-grow: 1;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        button {
+            margin-left: 0.5rem;
+            padding: 0.5rem 1rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+        #loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #007bff;
+            animation: spin 1s ease infinite;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+
+
+#clear-history {
+    padding: 0.5rem 1rem;
+    background-color: red;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#clear-history:hover {
+    background-color: darkred;
+}
+
+#clear-form {
+    position: absolute;
+    bottom: 10px;  /* Adjust as needed */
+    right: 10px;   /* Adjust as needed */
+}
+
+
+li.user, li.assistant {
+    color: #333;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    display: block;
+    max-width: 80%;
+}
+
+li.user {
+    background-color: #ffffff;
+}
+
+li.assistant {
+    background-color: #f1f1f1;
+}
+
+.chat-container {
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+
+.info {
+    margin-top: 0.5rem;
+    color: blue;
+    cursor: pointer;
+}
+
+.info-body {
+    margin-top: 0.5rem;
+    color: black;
+}
+
+
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+
+        <ul id="messages">
+            {% for msg in history %}
+            <li class="{{msg.class}}"> {{msg.prefix}} {{ msg.content }}
+				{% if msg.info.len() > 0 %}
+                    <div class="info">
+                        info >>
+                        <div class="info-body" style="display:none;">{{ msg.info| safe }}</div>
+                    </div>
+                {% endif %}
+			</li>
+            {% endfor %}
+        </ul>
+
+
+        <form id="clear-form" action="/clear_history" method="POST">
+            <button id="clear-history" type="submit">Clear History</button>
+        </form>
+
+        <form id="chat-form" autocomplete="off">
+            <input id="input" type="text" placeholder="Type your message here">
+            <button>Send</button>
+        </form>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script>
+		$(document).ready(function() {
+			let socket;
+
+            function connect() {
+                socket = new WebSocket("ws://localhost:5000/websocket");
+
+                socket.onopen = function() {
+                    console.log("connection opened");
+                }
+
+                socket.onclose = function() {
+                    console.log("connection closed, reconnecting...");
+                    setTimeout(connect, 1000);
+                }
+
+                socket.onmessage = function(e) {
+                    console.log(e);
+                    try {
+                        var msg = JSON.parse(e.data);
+                        console.log(msg);
+
+
+						if (msg.type === 'assistant' || msg.type === 'user') {
+							console.log("ALL OK");
+							var messageElem = $('<li>').addClass(msg.type).text(msg.prefix + msg.content);
+							if (msg.info) {
+								var infoElem = $('<div>').addClass('info').text('info >>').append(
+									$('<div>').addClass('info-body').html(msg.info).hide()
+								);
+								messageElem.append(infoElem);
+								console.log(infoElem);
+							}
+							$('#messages').append(messageElem);
+							$('#messages').scrollTop($('#messages')[0].scrollHeight);
+						}
+
+						if (msg.type === 'assistant') {
+							$('#loading').hide(); // Hide the loading spinner only for AI responses
+						}
+
+
+							// The rest of your onmessage code...
+						} catch (error) {
+							console.error("Could not parse message as JSON:", e.data);
+						}
+                };
+            }
+
+            connect();
+
+
+
+
+
+
+
+			$('#chat-form').submit(function(e) {
+				e.preventDefault();
+				//socket.emit('message', $('#input').val());
+				console.log("send ");
+				socket.send($('#input').val())
+				$('#input').val('');
+				$('#loading').show(); // Show the loading spinner
+			});
+
+
+			$(document).on('click', '.info', function() {
+				$(this).find('.info-body').toggle();
+			});
+
+
+
+		});
+
+
+
+	</script>
+
+    <div id="loading">
+        <div class="spinner"></div>
+    </div>
+
+
+</body>
+</html>
