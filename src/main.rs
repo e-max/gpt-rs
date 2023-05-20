@@ -9,6 +9,8 @@ use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
 use std::fs::File;
 use std::sync::Arc;
 use structopt::StructOpt;
+use log::{info,error};
+use env_logger;
 
 use axum::{response::IntoResponse, routing::get, Router};
 
@@ -43,6 +45,10 @@ struct Opt {
 #[tokio::main]
 async fn main() -> Result<()> {
     let opt = Opt::from_args();
+    std::env::set_var("RUST_LOG", "info");
+    env_logger::init();
+
+    info!("gpt-rs starting up...");
 
     tracing_subscriber::registry()
         .with(
@@ -61,9 +67,11 @@ async fn main() -> Result<()> {
     let file = File::open("./embeddings.csv").unwrap();
     let reader = std::io::BufReader::new(file);
     let embeddings = Embeddings::load(reader)?;
+    info!("Loaded embeddings");
+
     let client = Client::new(&api_key);
 
-    println!("\x1b[0;32m listening on {} \x1b[0m", opt.listen);
+    info!("\x1b[0;32m listening on {} \x1b[0m", opt.listen);
 
     let app_state = Arc::new(AppState { embeddings, client });
     let app = Router::new()
@@ -91,7 +99,7 @@ async fn websocket_handler(
         .get::<String>("hist")
         .and_then(|filename| {
             History::load(&filename)
-                .map_err(|e| println!("Couldn't open file {}: {}", filename, e))
+                .map_err(|e| error!("Couldn't open file {}: {}", filename, e))
                 .ok()
         })
         .unwrap_or_else(History::new);
@@ -107,14 +115,14 @@ async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: His
     //send a ping (unsupported by some browsers) just to kick things off and get a response
     //
 
-    println!("\x1b[0;32m open socket2 \x1b[0m");
+    info!("\x1b[0;32m open socket2 \x1b[0m");
     match WebSocket::initiate(socket).await {
         Err(e) => {
-            println!(" Couldn't initiate websocket {}", e);
+            error!(" Couldn't initiate websocket {}", e);
         }
         Ok(mut socket) => {
             while let Some(msg) = socket.next().await {
-                println!("Got message: {}", msg);
+                info!("Got message: {}", msg);
                 if let Err(e) = process_message(
                     &msg,
                     &mut history,
@@ -124,7 +132,7 @@ async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: His
                 )
                 .await
                 {
-                    println!("Got error {} while processing message {}", e, msg);
+                    info!("Got error {} while processing message {}", e, msg);
                 }
             }
         }
@@ -184,7 +192,7 @@ async fn index(mut session: WritableSession) -> impl IntoResponse {
         .get::<String>("hist")
         .and_then(|filename| {
             History::load(&filename)
-                .map_err(|e| println!("Couldn't open file {}: {}", filename, e))
+                .map_err(|e| error!("Couldn't open file {}: {}", filename, e))
                 .ok()
         })
         .unwrap_or_else(History::new);

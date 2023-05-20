@@ -3,6 +3,7 @@ use std::{
     io::{BufRead, Write},
     path::Path,
 };
+use log::{error};
 
 use anyhow::Result;
 use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionResponseMessage, Role};
@@ -91,7 +92,7 @@ impl<'a> History<'a> {
             .collect();
 
         History::load(&name)
-            .map_err(|e| println!("Cannot create history file {}", e))
+            .map_err(|e| error!("Cannot create history file {}", e))
             .unwrap_or(History {
                 name: None,
                 messages: vec![],
@@ -141,13 +142,13 @@ impl<'a> History<'a> {
 
     pub fn user(&mut self, message: Message<'a>) {
         if let Err(e) = self.save(&message) {
-            println!("Couldn't save history: {} file {:?}", e, self.name);
+            error!("Couldn't save history: {} file {:?}", e, self.name);
         }
         self.messages.push(message);
     }
     pub fn assistant(&mut self, message: Message<'a>) {
         if let Err(e) = self.save(&message) {
-            println!("Couldn't save history: {} file {:?}", e, self.name);
+            error!("Couldn't save history: {} file {:?}", e, self.name);
         }
         self.messages.push(message);
     }
