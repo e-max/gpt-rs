@@ -9,7 +9,7 @@ use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
 use std::fs::File;
 use std::sync::Arc;
 use structopt::StructOpt;
-use log::{info,error};
+use log::{info,error,warn};
 use env_logger;
 
 use axum::{response::IntoResponse, routing::get, Router};
@@ -132,7 +132,10 @@ async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: His
                 )
                 .await
                 {
-                    info!("Got error {} while processing message {}", e, msg);
+                    warn!("Got error {} while processing message {}", e, msg);
+                    for cause in e.chain() {
+                        warn!("- cause {:?}", cause);
+                    }
                 }
             }
         }
