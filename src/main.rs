@@ -6,6 +6,7 @@ use axum::routing::post;
 use gpt_rs::history::{History, InfoBuilder, Message};
 use gpt_rs::websocket::WebSocket;
 use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
+use gpt_rs::timer;
 use std::fs::File;
 use std::sync::Arc;
 use structopt::StructOpt;
@@ -109,18 +110,6 @@ async fn websocket_handler(
     // }
 
     ws.on_upgrade(|socket| websocket(socket, state, history))
-}
-
-
-// XXX куда его правильно положить?
-macro_rules! timer {
-    ($label:expr, $expr:expr) => {{
-        let start = std::time::Instant::now();
-        let result = $expr;
-        let duration = start.elapsed();
-        info!("{}: time taken: {:?}", $label, duration);
-        result
-    }};
 }
 
 async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: History<'_>) {

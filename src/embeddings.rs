@@ -10,6 +10,8 @@ use std::{
     path::Path,
 };
 use tiktoken_rs::async_openai::num_tokens_from_messages;
+use crate::timer;
+use log::info;
 
 #[derive(Debug)]
 pub struct Embeddings {
@@ -112,7 +114,9 @@ impl Embeddings {
         emb: &Array1<f32>,
         token_budget: u16,
     ) -> Result<(ChatCompletionRequestMessage, ContextInfo), Error> {
-        let similar = self.top_similar(emb);
+        let similar = timer!("top_similar", {
+            self.top_similar(emb)
+        });
 
         let mut message = ChatCompletionRequestMessage {
         role: Role::User,
@@ -130,7 +134,9 @@ impl Embeddings {
             )?))?;
             let mut new_message = message.clone();
             new_message.content.push_str(&article.to_string());
-            let num_tokens = num_tokens_from_messages(CHAT_MODEL, &[new_message.clone()])?;
+            let num_tokens = timer!("num_tokens_from_messages", {
+                num_tokens_from_messages(CHAT_MODEL, &[new_message.clone()])?
+            });
             if num_tokens < (token_budget as usize) {
                 message = new_message;
                 filenames.push(filename);
