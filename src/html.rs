@@ -3,12 +3,7 @@ use async_openai::types::Role;
 use axum::http::StatusCode;
 use axum::response::{Html, Response};
 
-use axum::{
-    extract::ws::{Message as WsMessage, WebSocket, WebSocketUpgrade},
-    response::IntoResponse,
-    routing::get,
-    Router,
-};
+use axum::response::IntoResponse;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]

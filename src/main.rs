@@ -1,36 +1,26 @@
 use anyhow::Result;
 use async_openai::types::ChatCompletionRequestMessage;
 use axum::extract::State;
-use axum::http::StatusCode;
 use axum::response::Redirect;
 use axum::routing::post;
-use gpt_rs::history::{History, Info, InfoBuilder, Message};
+use gpt_rs::history::{History, InfoBuilder, Message};
 use gpt_rs::websocket::WebSocket;
 use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
-use std::io;
 use std::sync::Arc;
-use std::{fs::File, io::Write};
+use std::fs::File;
 
 use axum::{response::IntoResponse, routing::get, Router};
 
-use std::borrow::Cow;
-use std::ops::ControlFlow;
-use std::{net::SocketAddr, path::PathBuf};
 use tower_http::{
-    services::ServeDir,
-    trace::{DefaultMakeSpan, TraceLayer},
-};
+    services::ServeDir};
 
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-//allows to extract the IP of connecting user
-use axum::extract::connect_info::ConnectInfo;
-use axum::extract::ws::{CloseFrame, WebSocket as AxumWebSocket, WebSocketUpgrade};
+use axum::extract::ws::{WebSocket as AxumWebSocket, WebSocketUpgrade};
 
 //allows to split the websocket stream into separate TX and RX branches
 //use futures::{sink::SinkExt, stream::StreamExt};
-use axum_sessions::{
-    async_session::MemoryStore, extractors::WritableSession, PersistencePolicy, SessionLayer,
+use axum_sessions::{extractors::WritableSession, SessionLayer,
 };
 
 use gpt_rs::embeddings::Embeddings;
@@ -62,7 +52,6 @@ async fn main() -> Result<()> {
     let reader = std::io::BufReader::new(file);
     let embeddings = Embeddings::load(reader)?;
     let client = Client::new(&api_key);
-    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
 
     println!("\x1b[0;32m started \x1b[0m");
 
@@ -86,13 +75,8 @@ async fn main() -> Result<()> {
 async fn websocket_handler(
     ws: WebSocketUpgrade,
     State(state): State<Arc<AppState>>,
-    mut session: WritableSession,
+    session: WritableSession,
 ) -> impl IntoResponse {
-    println!("\x1b[0;32m open socket \x1b[0m");
-
-    let eee = session.get::<String>("hist");
-
-    println!("\x1b[0;36m eee \x1b[0m= {:?}", eee);
 
     let history = session
         .get::<String>("hist")
@@ -110,7 +94,7 @@ async fn websocket_handler(
     ws.on_upgrade(|socket| websocket(socket, state, history))
 }
 
-async fn websocket(mut socket: AxumWebSocket, state: Arc<AppState>, mut history: History<'_>) {
+async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: History<'_>) {
     //send a ping (unsupported by some browsers) just to kick things off and get a response
     //
 
@@ -118,7 +102,6 @@ async fn websocket(mut socket: AxumWebSocket, state: Arc<AppState>, mut history:
     match WebSocket::initiate(socket).await {
         Err(e) => {
             println!(" Couldn't initiate websocket {}", e);
-            return;
         }
         Ok(mut socket) => {
             while let Some(msg) = socket.next().await {
@@ -150,7 +133,7 @@ where
     'a: 'b,
 {
     let mut info = InfoBuilder::default();
-    let user_msg = Message::user(&msg)?;
+    let user_msg = Message::user(msg)?;
     info.user_message_tokens(user_msg.tokens.into());
     socket.send(HTMLMsg::from(&user_msg)).await?;
 
@@ -162,7 +145,7 @@ where
     let history_size = pruned_messages.iter().map(|m| m.tokens).sum::<u16>();
     info.history_size(history_size.into());
 
-    let emb = client.get_embedding(&msg).await?;
+    let emb = client.get_embedding(msg).await?;
     let (context_msg, context_info) =
         embeddings.prepare_context(&emb, MAX_TOKENS - history_size - RESPONSE_SIZE)?;
 
@@ -203,7 +186,7 @@ async fn index(mut session: WritableSession) -> impl IntoResponse {
     let history = history
         .messages()
         .iter()
-        .map(|m| HTMLMsg::from(m))
+        .map(HTMLMsg::from)
         .collect();
 
     let template = IndexTemplate { history };

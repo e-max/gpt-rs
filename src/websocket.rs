@@ -2,12 +2,7 @@ use anyhow::Result;
 use serde::Serialize;
 use std::ops::ControlFlow;
 
-use axum::{
-    extract::ws::{Message as WsMessage, WebSocket as AxumWebSocket, WebSocketUpgrade},
-    response::IntoResponse,
-    routing::get,
-    Router,
-};
+use axum::extract::ws::{Message as WsMessage, WebSocket as AxumWebSocket};
 
 pub struct WebSocket {
     socket: AxumWebSocket,

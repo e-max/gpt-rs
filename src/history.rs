@@ -1,10 +1,10 @@
 use std::{
-    fs::{File, OpenOptions},
+    fs::OpenOptions,
     io::{BufRead, Write},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionResponseMessage, Role};
 use derive_builder::Builder;
 use rand::distributions::Alphanumeric;
@@ -41,7 +41,7 @@ impl<'a> Message<'a> {
             content: text.to_string(),
             name: None,
         };
-        let tokens = num_tokens_from_messages(CHAT_MODEL, &vec![msg.clone()])? as u16;
+        let tokens = num_tokens_from_messages(CHAT_MODEL, &[msg.clone()])? as u16;
         Ok(Message {
             msg,
             tokens,
@@ -54,7 +54,7 @@ impl<'a> Message<'a> {
             content: resp.content,
             name: None,
         };
-        let tokens = num_tokens_from_messages(CHAT_MODEL, &vec![msg.clone()])? as u16;
+        let tokens = num_tokens_from_messages(CHAT_MODEL, &[msg.clone()])? as u16;
         Ok(Message {
             msg,
             tokens,
@@ -130,7 +130,7 @@ impl<'a> History<'a> {
             let mut file = OpenOptions::new()
                 .append(true)
                 .create(true)
-                .open(&filename)?;
+                .open(filename)?;
 
             serde_json::to_writer(&file, message)?;
             file.write_all(b"\n")?;
@@ -170,3 +170,11 @@ impl<'a> History<'a> {
         &self.messages
     }
 }
+
+impl<'a> Default for History<'a> {
+    fn default() -> Self {
+         Self::new()
+     }
+}
+
+
