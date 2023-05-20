@@ -6,13 +6,12 @@ use axum::routing::post;
 use gpt_rs::history::{History, InfoBuilder, Message};
 use gpt_rs::websocket::WebSocket;
 use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
-use std::sync::Arc;
 use std::fs::File;
+use std::sync::Arc;
 
 use axum::{response::IntoResponse, routing::get, Router};
 
-use tower_http::{
-    services::ServeDir};
+use tower_http::services::ServeDir;
 
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -20,8 +19,7 @@ use axum::extract::ws::{WebSocket as AxumWebSocket, WebSocketUpgrade};
 
 //allows to split the websocket stream into separate TX and RX branches
 //use futures::{sink::SinkExt, stream::StreamExt};
-use axum_sessions::{extractors::WritableSession, SessionLayer,
-};
+use axum_sessions::{extractors::WritableSession, SessionLayer};
 
 use gpt_rs::embeddings::Embeddings;
 use gpt_rs::html::{HtmlTemplate, IndexTemplate, Message as HTMLMsg};
@@ -77,7 +75,6 @@ async fn websocket_handler(
     State(state): State<Arc<AppState>>,
     session: WritableSession,
 ) -> impl IntoResponse {
-
     let history = session
         .get::<String>("hist")
         .and_then(|filename| {
@@ -183,11 +180,7 @@ async fn index(mut session: WritableSession) -> impl IntoResponse {
         session.insert("hist", hist_name.to_string()).unwrap();
     }
 
-    let history = history
-        .messages()
-        .iter()
-        .map(HTMLMsg::from)
-        .collect();
+    let history = history.messages().iter().map(HTMLMsg::from).collect();
 
     let template = IndexTemplate { history };
     HtmlTemplate(template)

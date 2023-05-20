@@ -173,8 +173,6 @@ impl<'a> History<'a> {
 
 impl<'a> Default for History<'a> {
     fn default() -> Self {
-         Self::new()
-     }
+        Self::new()
+    }
 }
-
-
