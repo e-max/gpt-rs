@@ -8,6 +8,7 @@ use gpt_rs::websocket::WebSocket;
 use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
 use std::fs::File;
 use std::sync::Arc;
+use structopt::StructOpt;
 
 use axum::{response::IntoResponse, routing::get, Router};
 
@@ -30,8 +31,19 @@ pub struct AppState {
     client: Client,
 }
 
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "gpt-rs", about = "AI chatbot webapp")]
+struct Opt {
+    #[structopt(short = "l", long = "listen", default_value = "0.0.0.0:5000")]
+    listen: String,
+}
+
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    let opt = Opt::from_args();
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -51,7 +63,7 @@ async fn main() -> Result<()> {
     let embeddings = Embeddings::load(reader)?;
     let client = Client::new(&api_key);
 
-    println!("\x1b[0;32m started \x1b[0m");
+    println!("\x1b[0;32m listening on {} \x1b[0m", opt.listen);
 
     let app_state = Arc::new(AppState { embeddings, client });
     let app = Router::new()
@@ -62,7 +74,7 @@ async fn main() -> Result<()> {
         .layer(session_layer)
         .with_state(app_state);
 
-    axum::Server::bind(&"0.0.0.0:5000".parse().unwrap())
+    axum::Server::bind(&opt.listen.parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();
