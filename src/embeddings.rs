@@ -1,4 +1,4 @@
-use crate::{CHAT_MODEL, DATA_DIR, EMBEDDING_SIZE};
+use crate::{DATA_DIR, EMBEDDING_SIZE};
 use anyhow::Error;
 use async_openai::types::{ChatCompletionRequestMessage, Role};
 use ndarray::{Array, Array1, Array2, ArrayView1, Axis};
@@ -9,7 +9,6 @@ use std::{
     io::{BufReader, Read},
     path::Path,
 };
-use tiktoken_rs::async_openai::num_tokens_from_messages;
 use crate::timer;
 use log::info;
 
@@ -29,6 +28,14 @@ pub struct Article {
 impl ToString for Article {
     fn to_string(&self) -> String {
         format!(r#"\n\n Article {}:\n"""\n{}\n""""#, self.title, self.body)
+    }
+}
+
+impl Article {
+    fn estimated_total_tokens(&self) -> usize {
+        // Approximately how many tokens, according to the embedding model, are in the text returned from to_string() method.
+        // Determined empirically.
+        return self.tokens + 15;
     }
 }
 
@@ -119,10 +126,12 @@ impl Embeddings {
         });
 
         let mut message = ChatCompletionRequestMessage {
-        role: Role::User,
-        content: "Use the below articles about the game Vallheim to answer the subsequent question. If the answer cannot be found in the articles, write 'I could not find an answer.'".to_string(),
-        name: None,
-    };
+            role: Role::User,
+            content: "Use the below articles about the game Vallheim to answer the subsequent question. If the answer cannot be found in the articles, write 'I could not find an answer.'".to_string(),
+            name: None,
+        };
+        let mut total_tokens = 41; // number of tokens in the initial content phrase above; re-calculate this if you change the phrase
+
         let dir = Path::new(DATA_DIR);
 
         let mut filenames = vec![];
@@ -134,13 +143,15 @@ impl Embeddings {
             )?))?;
             let mut new_message = message.clone();
             new_message.content.push_str(&article.to_string());
-            let num_tokens = timer!("num_tokens_from_messages", {
-                num_tokens_from_messages(CHAT_MODEL, &[new_message.clone()])?
-            });
-            if num_tokens < (token_budget as usize) {
+
+            total_tokens += article.estimated_total_tokens();
+            // ^^^ can be calculated precisely by calling  
+            // tiktoken_rs::async_openai::num_tokens_from_messages(CHAT_MODEL, &[new_message.clone()]) but it is expensive
+
+            if total_tokens < (token_budget as usize) {
                 message = new_message;
                 filenames.push(filename);
-                size += num_tokens;
+                size += total_tokens;
             } else {
                 break;
             }
