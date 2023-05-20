@@ -5,6 +5,7 @@ use axum::response::Redirect;
 use axum::routing::post;
 use gpt_rs::history::{History, InfoBuilder, Message};
 use gpt_rs::websocket::WebSocket;
+use gpt_rs::cli::cli_chat_loop;
 use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
 use gpt_rs::timer;
 use std::fs::File;
@@ -39,6 +40,9 @@ pub struct AppState {
 struct Opt {
     #[structopt(short = "l", long = "listen", default_value = "0.0.0.0:5000")]
     listen: String,
+
+    #[structopt(short = "c", long = "cli")]
+    cli: bool,
 }
 
 
@@ -69,6 +73,11 @@ async fn main() -> Result<()> {
     info!("Loaded embeddings");
 
     let client = Client::new(&api_key);
+
+    if opt.cli {
+        cli_chat_loop(&embeddings, &client).await;
+        return Ok(())
+    }
 
     info!("\x1b[0;32mlistening on {} \x1b[0m", opt.listen);
 
