@@ -71,7 +71,7 @@ async fn main() -> Result<()> {
 
     let client = Client::new(&api_key);
 
-    info!("\x1b[0;32m listening on {} \x1b[0m", opt.listen);
+    info!("\x1b[0;32mlistening on {} \x1b[0m", opt.listen);
 
     let app_state = Arc::new(AppState { embeddings, client });
     let app = Router::new()
@@ -111,14 +111,26 @@ async fn websocket_handler(
     ws.on_upgrade(|socket| websocket(socket, state, history))
 }
 
+
+// XXX куда его правильно положить?
+macro_rules! timer {
+    ($label:expr, $expr:expr) => {{
+        let start = std::time::Instant::now();
+        let result = $expr;
+        let duration = start.elapsed();
+        info!("{}: time taken: {:?}", $label, duration);
+        result
+    }};
+}
+
 async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: History<'_>) {
     //send a ping (unsupported by some browsers) just to kick things off and get a response
     //
 
-    info!("\x1b[0;32m open socket2 \x1b[0m");
+    info!("\x1b[0;32mopen socket2 \x1b[0m");
     match WebSocket::initiate(socket).await {
         Err(e) => {
-            error!(" Couldn't initiate websocket {}", e);
+            error!("Couldn't initiate websocket {}", e);
         }
         Ok(mut socket) => {
             while let Some(msg) = socket.next().await {
@@ -165,9 +177,12 @@ where
     let history_size = pruned_messages.iter().map(|m| m.tokens).sum::<u16>();
     info.history_size(history_size.into());
 
-    let emb = client.get_embedding(msg).await?;
-    let (context_msg, context_info) =
-        embeddings.prepare_context(&emb, MAX_TOKENS - history_size - RESPONSE_SIZE)?;
+    let emb = timer!("get_embedding", {
+        client.get_embedding(msg).await?
+    });
+    let (context_msg, context_info) = timer!("prepare_context", {
+        embeddings.prepare_context(&emb, MAX_TOKENS - history_size - RESPONSE_SIZE)?
+    });
 
     info.context_info(context_info);
 
@@ -178,7 +193,9 @@ where
             .map(|m| m.msg.clone())
             .collect::<Vec<ChatCompletionRequestMessage>>(),
     );
-    let resp = client.chat(&messages).await?;
+    let resp = timer!("openai chat completion", {
+        client.chat(&messages).await?
+    });
     let resp_msg = Message::from_response(resp, info.build()?)?;
     socket.send(HTMLMsg::from(&resp_msg)).await?;
     history.assistant(resp_msg);
