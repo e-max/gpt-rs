@@ -72,7 +72,8 @@ pub struct ContextInfo<'a> {
 }
 
 impl Embeddings {
-    pub fn load<R: Read>(reader: R) -> Result<Self, Error> {
+    #[tracing::instrument]
+    pub fn load<R: Read + std::fmt::Debug>(reader: R) -> Result<Self, Error> {
         let mut rdr = csv::Reader::from_reader(reader);
         let mut record = csv::ByteRecord::new();
 

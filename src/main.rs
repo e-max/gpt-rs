@@ -24,6 +24,7 @@ use axum_sessions::{extractors::WritableSession, SessionLayer};
 use gpt_rs::embeddings::Embeddings;
 use gpt_rs::html::{HtmlTemplate, IndexTemplate, Message as HTMLMsg};
 use gpt_rs::openai::Client;
+use tracing_subscriber::fmt::format::FmtSpan;
 
 pub struct AppState {
     embeddings: Embeddings,
@@ -35,9 +36,9 @@ async fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "example_websockets=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "gpt_rs=debug,tower_http=debug".into()),
         )
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::CLOSE))
         .init();
 
     let store = async_session::CookieStore::new();
