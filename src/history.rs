@@ -3,7 +3,7 @@ use std::{
     io::{BufRead, Write},
     path::Path,
 };
-use log::{error};
+use tracing::error;
 
 use anyhow::Result;
 use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionResponseMessage, Role};

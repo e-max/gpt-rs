@@ -10,7 +10,7 @@ use std::{
     path::Path,
 };
 use crate::timer;
-use log::info;
+use tracing::info;
 
 #[derive(Debug)]
 pub struct Embeddings {

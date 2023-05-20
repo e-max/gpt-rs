@@ -10,8 +10,7 @@ use gpt_rs::timer;
 use std::fs::File;
 use std::sync::Arc;
 use structopt::StructOpt;
-use log::{info,error,warn};
-use env_logger;
+use tracing::{info,error,warn};
 
 use axum::{response::IntoResponse, routing::get, Router};
 
@@ -47,17 +46,16 @@ struct Opt {
 async fn main() -> Result<()> {
     let opt = Opt::from_args();
     std::env::set_var("RUST_LOG", "info");
-    env_logger::init();
-
-    info!("gpt-rs starting up...");
 
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "example_websockets=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "gpt_rs=info,tower_http=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    info!("gpt-rs starting up...");
 
     let store = async_session::CookieStore::new();
     let secret = b"593jfdslgdsgdssjgdsghljfshp[jmvadlk;hgadljgdahm'dvahfdlfgadssmlf"; // MUST be at least 64 bytes!
