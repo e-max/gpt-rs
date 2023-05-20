@@ -174,7 +174,7 @@ li.assistant {
 			let socket;
 
             function connect() {
-                socket = new WebSocket("ws://localhost:5000/websocket");
+                socket = new WebSocket("wss://valheim-bot.e-max.dev/websocket");
 
                 socket.onopen = function() {
                     console.log("connection opened");
@@ -193,7 +193,6 @@ li.assistant {
 
 
 						if (msg.type === 'assistant' || msg.type === 'user') {
-							console.log("ALL OK");
 							var messageElem = $('<li>').addClass(msg.type).text(msg.prefix + msg.content);
 							if (msg.info) {
 								var infoElem = $('<div>').addClass('info').text('info >>').append(
