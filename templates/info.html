@@ -8,7 +8,7 @@
 		<th> file </th><th>score</th>
             {% for file in info.context_info.filenames %}
 			<tr>
-				<td><a href="/context/{{file.filename}}">{{file.filename}}</a></td><td>{{file.score}}</td>
+				<td><a href="/context/{{file.filename}}" target='_blank'>{{file.filename}}</a></td><td>{{file.score}}</td>
 			</tr>
             {% endfor %}
 	</table>
