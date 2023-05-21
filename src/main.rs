@@ -8,6 +8,7 @@ use gpt_rs::websocket::WebSocket;
 use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
 use std::fs::File;
 use std::sync::Arc;
+use tokio::signal;
 
 use axum::{response::IntoResponse, routing::get, Router};
 
@@ -25,6 +26,10 @@ use gpt_rs::embeddings::Embeddings;
 use gpt_rs::html::{HtmlTemplate, IndexTemplate, Message as HTMLMsg};
 use gpt_rs::openai::Client;
 
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 pub struct AppState {
     embeddings: Embeddings,
     client: Client,
@@ -32,6 +37,10 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
+
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -64,6 +73,7 @@ async fn main() -> Result<()> {
 
     axum::Server::bind(&"0.0.0.0:5000".parse().unwrap())
         .serve(app.into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
 
@@ -185,3 +195,30 @@ async fn index(mut session: WritableSession) -> impl IntoResponse {
     let template = IndexTemplate { history };
     HtmlTemplate(template)
 }
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    println!("signal received, starting graceful shutdown");
+}
+
