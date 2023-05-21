@@ -5,7 +5,7 @@ use axum::response::Redirect;
 use axum::routing::post;
 use gpt_rs::history::{History, InfoBuilder, Message};
 use gpt_rs::websocket::WebSocket;
-use gpt_rs::cli::cli_chat_loop;
+//use gpt_rs::cli::cli_chat_loop;
 use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
 use gpt_rs::timer;
 use std::fs::File;
@@ -40,8 +40,6 @@ use std::println as error;
 use std::println as warn;
 
 pub struct AppState {
-    embeddings: Embeddings,
-    client: Client,
 }
 
 
@@ -51,8 +49,10 @@ struct Opt {
     #[structopt(short = "l", long = "listen", default_value = "0.0.0.0:5000")]
     listen: String,
 
+    /*
     #[structopt(short = "c", long = "cli")]
     cli: bool,
+    */
 }
 
 
@@ -68,23 +68,17 @@ async fn main() -> Result<()> {
     let secret = b"593jfdslgdsgdssjgdsghljfshp[jmvadlk;hgadljgdahm'dvahfdlfgadssmlf"; // MUST be at least 64 bytes!
     let session_layer = SessionLayer::new(store, secret);
 
-    let api_key =
-        std::env::var("OPENAI_API_KEY").expect("Expect OPENAI_API_KEY environment variable");
-    let file = File::open("./embeddings.csv").unwrap();
-    let reader = std::io::BufReader::new(file);
-    let embeddings = Embeddings::load(reader)?;
-    info!("Loaded embeddings");
 
-    let client = Client::new(&api_key);
-
+    /*
     if opt.cli {
         cli_chat_loop(&embeddings, &client).await;
         return Ok(())
     }
+    */
 
     info!("\x1b[0;32mlistening on {} \x1b[0m", opt.listen);
 
-    let app_state = Arc::new(AppState { embeddings, client });
+    let app_state = Arc::new(AppState {  });
     let app = Router::new()
         .route("/", get(index))
         .route("/clear_history", post(clear_history))
@@ -105,25 +99,13 @@ async fn main() -> Result<()> {
 async fn websocket_handler(
     ws: WebSocketUpgrade,
     State(state): State<Arc<AppState>>,
-    session: WritableSession,
+    _session: WritableSession,
 ) -> impl IntoResponse {
-    let history = session
-        .get::<String>("hist")
-        .and_then(|filename| {
-            History::load(&filename)
-                .map_err(|e| error!("Couldn't open file {}: {}", filename, e))
-                .ok()
-        })
-        .unwrap_or_else(History::new);
 
-    // if let Some(name) = &history.name {
-    //     session.insert_raw("hist", name.to_string());
-    // }
-
-    ws.on_upgrade(|socket| websocket(socket, state, history))
+    ws.on_upgrade(|socket| websocket(socket, state))
 }
 
-async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: History<'_>) {
+async fn websocket(socket: AxumWebSocket, _state: Arc<AppState>) {
     //send a ping (unsupported by some browsers) just to kick things off and get a response
     //
 
@@ -137,9 +119,6 @@ async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: His
                 info!("Got message: {}", msg);
                 if let Err(e) = process_message(
                     &msg,
-                    &mut history,
-                    &state.embeddings,
-                    &state.client,
                     &mut socket,
                 )
                 .await
@@ -156,14 +135,24 @@ async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: His
 
 async fn process_message<'a, 'b>(
     msg: &str,
-    history: &mut History<'b>,
-    embeddings: &'a Embeddings,
-    client: &Client,
     socket: &mut WebSocket,
 ) -> Result<()>
 where
     'a: 'b,
 {
+    /* <this stuff was previously global> */
+    let mut history = History::new();
+    let file = File::open("./embeddings.csv").unwrap();
+    let reader = std::io::BufReader::new(file);
+    let embeddings = Embeddings::load(reader)?;
+    info!("Loaded embeddings");
+
+    let api_key =
+        std::env::var("OPENAI_API_KEY").expect("Expect OPENAI_API_KEY environment variable");
+
+    let client = Client::new(&api_key);
+    /* </this stuff was previously global> */
+
     let mut info = InfoBuilder::default();
     let user_msg = Message::user(msg)?;
     info.user_message_tokens(user_msg.tokens.into());
