@@ -1,6 +1,7 @@
 use anyhow::Result;
 use serde::Serialize;
 use std::ops::ControlFlow;
+use tracing::{warn,debug};
 
 use axum::extract::ws::{Message as WsMessage, WebSocket as AxumWebSocket};
 
@@ -12,7 +13,7 @@ impl WebSocket {
     pub async fn initiate(mut socket: AxumWebSocket) -> Result<Self> {
         //send a ping (unsupported by some browsers) just to kick things off and get a response
         socket.send(WsMessage::Ping(vec![1, 2, 3])).await?;
-        println!("Pinged ...");
+        debug!("Pinged ...");
 
         Ok(Self { socket })
     }
@@ -26,7 +27,7 @@ impl WebSocket {
                     ControlFlow::Break(_) => return None,
                 }
             } else {
-                println!("client  abruptly disconnected");
+                warn!("client  abruptly disconnected");
                 return None;
             }
         }
@@ -47,34 +48,34 @@ impl WebSocket {
 fn process_message(msg: WsMessage) -> ControlFlow<(), Option<String>> {
     match msg {
         WsMessage::Text(t) => {
-            println!(">>>  sent str: {:?}", t);
+            debug!(">>>  sent str: {:?}", t);
             ControlFlow::Continue(Some(t))
         }
         WsMessage::Binary(d) => {
-            println!(">>> sent {} bytes: {:?}", d.len(), d);
+            debug!(">>> sent {} bytes: {:?}", d.len(), d);
             ControlFlow::Continue(None)
         }
         WsMessage::Close(c) => {
             if let Some(cf) = c {
-                println!(
+                warn!(
                     ">>> sent close with code {} and reason `{}`",
                     cf.code, cf.reason
                 );
             } else {
-                println!(">>>  somehow sent close message without CloseFrame");
+                warn!(">>>  somehow sent close message without CloseFrame");
             }
             ControlFlow::Break(())
         }
 
         WsMessage::Pong(v) => {
-            println!(">>> sent pong with {:?}", v);
+            debug!(">>> sent pong with {:?}", v);
             ControlFlow::Continue(None)
         }
         // You should never need to manually handle WsMessage::Ping, as axum's websocket library
         // will do so for you automagically by replying with Pong and copying the v according to
         // spec. But if you need the contents of the pings you can see them here.
         WsMessage::Ping(v) => {
-            println!(">>>  sent ping with {:?}", v);
+            debug!(">>>  sent ping with {:?}", v);
             ControlFlow::Continue(None)
         }
     }

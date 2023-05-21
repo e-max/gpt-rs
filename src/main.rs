@@ -5,10 +5,17 @@ use axum::response::Redirect;
 use axum::routing::post;
 use gpt_rs::history::{History, InfoBuilder, Message};
 use gpt_rs::websocket::WebSocket;
+use gpt_rs::cli::cli_chat_loop;
 use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
+use gpt_rs::timer;
 use std::fs::File;
 use std::sync::Arc;
+
+use structopt::StructOpt;
+use tracing::{info,error,warn};
+
 use tokio::signal;
+
 
 
 use axum::{response::IntoResponse, routing::get, Router};
@@ -33,15 +40,33 @@ pub struct AppState {
     client: Client,
 }
 
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "gpt-rs", about = "AI chatbot webapp")]
+struct Opt {
+    #[structopt(short = "l", long = "listen", default_value = "0.0.0.0:5000")]
+    listen: String,
+
+    #[structopt(short = "c", long = "cli")]
+    cli: bool,
+}
+
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    let opt = Opt::from_args();
+    std::env::set_var("RUST_LOG", "info");
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "gpt_rs=debug,tower_http=debug".into()),
+
         )
         .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::CLOSE))
         .init();
+
+    info!("gpt-rs starting up...");
 
     let store = async_session::CookieStore::new();
     let secret = b"593jfdslgdsgdssjgdsghljfshp[jmvadlk;hgadljgdahm'dvahfdlfgadssmlf"; // MUST be at least 64 bytes!
@@ -52,9 +77,16 @@ async fn main() -> Result<()> {
     let file = File::open("./embeddings.csv").unwrap();
     let reader = std::io::BufReader::new(file);
     let embeddings = Embeddings::load(reader)?;
+    info!("Loaded embeddings");
+
     let client = Client::new(&api_key);
 
-    println!("\x1b[0;32m started \x1b[0m");
+    if opt.cli {
+        cli_chat_loop(&embeddings, &client).await;
+        return Ok(())
+    }
+
+    info!("\x1b[0;32mlistening on {} \x1b[0m", opt.listen);
 
     let app_state = Arc::new(AppState { embeddings, client });
     let app = Router::new()
@@ -65,7 +97,7 @@ async fn main() -> Result<()> {
         .layer(session_layer)
         .with_state(app_state);
 
-    axum::Server::bind(&"0.0.0.0:5000".parse().unwrap())
+    axum::Server::bind(&opt.listen.parse().unwrap())
         .serve(app.into_make_service())
         .with_graceful_shutdown(shutdown_signal())
         .await
@@ -83,7 +115,7 @@ async fn websocket_handler(
         .get::<String>("hist")
         .and_then(|filename| {
             History::load(&filename)
-                .map_err(|e| println!("Couldn't open file {}: {}", filename, e))
+                .map_err(|e| error!("Couldn't open file {}: {}", filename, e))
                 .ok()
         })
         .unwrap_or_else(History::new);
@@ -99,14 +131,14 @@ async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: His
     //send a ping (unsupported by some browsers) just to kick things off and get a response
     //
 
-    println!("\x1b[0;32m open socket2 \x1b[0m");
+    info!("\x1b[0;32mopen socket2 \x1b[0m");
     match WebSocket::initiate(socket).await {
         Err(e) => {
-            println!(" Couldn't initiate websocket {}", e);
+            error!("Couldn't initiate websocket {}", e);
         }
         Ok(mut socket) => {
             while let Some(msg) = socket.next().await {
-                println!("Got message: {}", msg);
+                info!("Got message: {}", msg);
                 if let Err(e) = process_message(
                     &msg,
                     &mut history,
@@ -116,7 +148,10 @@ async fn websocket(socket: AxumWebSocket, state: Arc<AppState>, mut history: His
                 )
                 .await
                 {
-                    println!("Got error {} while processing message {}", e, msg);
+                    warn!("Got error {} while processing message {}", e, msg);
+                    for cause in e.chain() {
+                        warn!("- cause {:?}", cause);
+                    }
                 }
             }
         }
@@ -146,9 +181,12 @@ where
     let history_size = pruned_messages.iter().map(|m| m.tokens).sum::<u16>();
     info.history_size(history_size.into());
 
-    let emb = client.get_embedding(msg).await?;
-    let (context_msg, context_info) =
-        embeddings.prepare_context(&emb, MAX_TOKENS - history_size - RESPONSE_SIZE)?;
+    let emb = timer!("get_embedding", {
+        client.get_embedding(msg).await?
+    });
+    let (context_msg, context_info) = timer!("prepare_context", {
+        embeddings.prepare_context(&emb, MAX_TOKENS - history_size - RESPONSE_SIZE)?
+    });
 
     info.context_info(context_info);
 
@@ -159,7 +197,9 @@ where
             .map(|m| m.msg.clone())
             .collect::<Vec<ChatCompletionRequestMessage>>(),
     );
-    let resp = client.chat(&messages).await?;
+    let resp = timer!("openai chat completion", {
+        client.chat(&messages).await?
+    });
     let resp_msg = Message::from_response(resp, info.build()?)?;
     socket.send(HTMLMsg::from(&resp_msg)).await?;
     history.assistant(resp_msg);
@@ -176,7 +216,7 @@ async fn index(mut session: WritableSession) -> impl IntoResponse {
         .get::<String>("hist")
         .and_then(|filename| {
             History::load(&filename)
-                .map_err(|e| println!("Couldn't open file {}: {}", filename, e))
+                .map_err(|e| error!("Couldn't open file {}: {}", filename, e))
                 .ok()
         })
         .unwrap_or_else(History::new);
