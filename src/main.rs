@@ -10,8 +10,13 @@ use gpt_rs::{DATA_DIR, MAX_TOKENS, RESPONSE_SIZE};
 use gpt_rs::timer;
 use std::fs::File;
 use std::sync::Arc;
+
 use structopt::StructOpt;
 use tracing::{info,error,warn};
+
+use tokio::signal;
+
+
 
 use axum::{response::IntoResponse, routing::get, Router};
 
@@ -28,6 +33,7 @@ use axum_sessions::{extractors::WritableSession, SessionLayer};
 use gpt_rs::embeddings::Embeddings;
 use gpt_rs::html::{HtmlTemplate, IndexTemplate, Message as HTMLMsg};
 use gpt_rs::openai::Client;
+use tracing_subscriber::fmt::format::FmtSpan;
 
 pub struct AppState {
     embeddings: Embeddings,
@@ -54,9 +60,10 @@ async fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "gpt_rs=info,tower_http=debug".into()),
+                .unwrap_or_else(|_| "gpt_rs=debug,tower_http=debug".into()),
+
         )
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::CLOSE))
         .init();
 
     info!("gpt-rs starting up...");
@@ -92,6 +99,7 @@ async fn main() -> Result<()> {
 
     axum::Server::bind(&opt.listen.parse().unwrap())
         .serve(app.into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
 
@@ -220,4 +228,30 @@ async fn index(mut session: WritableSession) -> impl IntoResponse {
 
     let template = IndexTemplate { history };
     HtmlTemplate(template)
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    println!("signal received, starting graceful shutdown");
 }
