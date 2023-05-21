@@ -12,7 +12,7 @@ use derive_builder::Builder;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use tiktoken_rs::async_openai::num_tokens_from_messages;
+//use tiktoken_rs::async_openai::num_tokens_from_messages;
 
 use crate::{embeddings::ContextInfo, CHAT_MODEL, HISTORY_DIR, MAX_HISTORY};
 
@@ -43,7 +43,8 @@ impl<'a> Message<'a> {
             content: text.to_string(),
             name: None,
         };
-        let tokens = num_tokens_from_messages(CHAT_MODEL, &[msg.clone()])? as u16;
+        //let tokens = num_tokens_from_messages(CHAT_MODEL, &[msg.clone()])? as u16;
+        let tokens = 0;
         Ok(Message {
             msg,
             tokens,
@@ -56,7 +57,8 @@ impl<'a> Message<'a> {
             content: resp.content,
             name: None,
         };
-        let tokens = num_tokens_from_messages(CHAT_MODEL, &[msg.clone()])? as u16;
+        //let tokens = num_tokens_from_messages(CHAT_MODEL, &[msg.clone()])? as u16;
+        let tokens = 0;
         Ok(Message {
             msg,
             tokens,
