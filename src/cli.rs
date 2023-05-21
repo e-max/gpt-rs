@@ -4,11 +4,12 @@ use anyhow::Result;
 use crate::embeddings::Embeddings;
 use crate::openai::Client;
 use crate::timer;
-use tracing::info;
+//use tracing::info;
 use async_openai::types::ChatCompletionRequestMessage;
 use crate::history::{History, Message};
 use crate::{MAX_TOKENS, RESPONSE_SIZE};
 
+use std::println as info;
 
 
 pub async fn cli_chat_loop(

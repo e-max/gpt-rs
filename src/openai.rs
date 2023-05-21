@@ -34,6 +34,10 @@ impl Client {
         &self,
         messages: &[ChatCompletionRequestMessage],
     ) -> Result<ChatCompletionResponseMessage, Error> {
+        //return Ok(ChatCompletionResponseMessage {
+         //   role: Role::Assistant,
+          //  content: "Answer".to_string(),
+        //});
         let request = CreateChatCompletionRequestArgs::default()
             .model(CHAT_MODEL)
             .messages(messages)

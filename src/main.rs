@@ -12,7 +12,7 @@ use std::fs::File;
 use std::sync::Arc;
 
 use structopt::StructOpt;
-use tracing::{info,error,warn};
+//use tracing::{info,error,warn};
 
 use tokio::signal;
 
@@ -34,6 +34,10 @@ use gpt_rs::embeddings::Embeddings;
 use gpt_rs::html::{HtmlTemplate, IndexTemplate, Message as HTMLMsg};
 use gpt_rs::openai::Client;
 use tracing_subscriber::fmt::format::FmtSpan;
+
+use std::println as info;
+use std::println as error;
+use std::println as warn;
 
 pub struct AppState {
     embeddings: Embeddings,
@@ -57,14 +61,6 @@ async fn main() -> Result<()> {
     let opt = Opt::from_args();
     std::env::set_var("RUST_LOG", "info");
 
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "gpt_rs=debug,tower_http=debug".into()),
-
-        )
-        .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::CLOSE))
-        .init();
 
     info!("gpt-rs starting up...");
 

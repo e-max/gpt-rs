@@ -1,7 +1,12 @@
 use anyhow::Result;
 use serde::Serialize;
 use std::ops::ControlFlow;
-use tracing::{warn,debug};
+//use tracing::{warn,debug};
+use std::println as info;
+use std::println as error;
+use std::println as warn;
+use std::println as debug;
+
 
 use axum::extract::ws::{Message as WsMessage, WebSocket as AxumWebSocket};
 
